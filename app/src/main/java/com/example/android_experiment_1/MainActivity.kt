@@ -29,6 +29,7 @@ import com.example.android_experiment_1.ui.theme.AndroidExperiment1Theme
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import androidx.compose.runtime.getValue
+import com.example.android_experiment_1.data.AddressResolver
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
@@ -68,6 +69,7 @@ class MainActivity : ComponentActivity() {
         requestPermissions()
 
         val mGeocoder = Geocoder(applicationContext, Locale.getDefault())
+        val addressResolver = AddressResolver()
 
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {
@@ -82,8 +84,9 @@ class MainActivity : ComponentActivity() {
                 latitudeTxt.value = location.latitude.toFixedString()
                 accuracyTxt.value =  location.accuracy.toFixedString()
 
-                val addresses = mGeocoder.getFromLocation(location.latitude, location.longitude, 1)
-                addressTxt.value = addresses?.firstOrNull()?.getAddressLine(0) ?: "!"
+                val addresses = mGeocoder.getFromLocation(location.latitude, location.longitude, 5)
+                val addressLine = addressResolver.resolve(addresses)
+                addressTxt.value = addressLine
             }
         }
 
