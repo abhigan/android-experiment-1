@@ -2,6 +2,7 @@ package com.example.android_experiment_1
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.location.Geocoder
 import android.os.Bundle
 import android.os.Looper
 import android.util.Log
@@ -32,6 +33,7 @@ import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.Priority
+import java.util.Locale
 
 private const val logTag = "LOGTAG1"
 private val locationProviderTxt = mutableStateOf("?")
@@ -39,6 +41,8 @@ private val altitudeTxt = mutableStateOf("?")
 private val speedTxt = mutableStateOf("?")
 private val longitudeTxt = mutableStateOf("?")
 private val latitudeTxt = mutableStateOf("?")
+private val addressTxt = mutableStateOf("?")
+private val accuracyTxt = mutableStateOf("?")
 
 class MainActivity : ComponentActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -63,6 +67,8 @@ class MainActivity : ComponentActivity() {
 
         requestPermissions()
 
+        val mGeocoder = Geocoder(applicationContext, Locale.getDefault())
+
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {
                 if(locationResult.locations.size != 1) {
@@ -70,10 +76,14 @@ class MainActivity : ComponentActivity() {
                 }
                 val location = locationResult.locations[0];
                 locationProviderTxt.value = location.provider ?: "!"
-                altitudeTxt.value = location.altitude.toString()
-                speedTxt.value = location.speed.toString()
-                longitudeTxt.value = location.longitude.toString()
-                latitudeTxt.value = location.latitude.toString()
+                altitudeTxt.value = location.altitude.toFixedString()
+                speedTxt.value = location.speed.toFixedString()
+                longitudeTxt.value = location.longitude.toFixedString()
+                latitudeTxt.value = location.latitude.toFixedString()
+                accuracyTxt.value =  location.accuracy.toFixedString()
+
+                val addresses = mGeocoder.getFromLocation(location.latitude, location.longitude, 1)
+                addressTxt.value = addresses?.firstOrNull()?.getAddressLine(0) ?: "!"
             }
         }
 
@@ -139,6 +149,10 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
                     text = txt,
                     modifier = modifier,
                 )
+                Text(
+                    text = "deg",
+                    modifier = modifier,
+                )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
                 val txt by longitudeTxt;
@@ -148,6 +162,10 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
                 )
                 Text(
                     text = txt,
+                    modifier = modifier,
+                )
+                Text(
+                    text = "deg",
                     modifier = modifier,
                 )
             }
@@ -161,6 +179,10 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
                     text = txt,
                     modifier = modifier,
                 )
+                Text(
+                    text = "km/hr",
+                    modifier = modifier,
+                )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
                 val txt by altitudeTxt;
@@ -172,6 +194,10 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
                     text = txt,
                     modifier = modifier,
                 )
+                Text(
+                    text = "m",
+                    modifier = modifier,
+                )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
                 val txt by locationProviderTxt;
@@ -179,6 +205,28 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
                     text = "Provider",
                     modifier = modifier,
                 )
+                Text(
+                    text = txt,
+                    modifier = modifier,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
+                val txt by accuracyTxt;
+                Text(
+                    text = "Accuracy",
+                    modifier = modifier,
+                )
+                Text(
+                    text = txt,
+                    modifier = modifier,
+                )
+                Text(
+                    text = "%",
+                    modifier = modifier,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
+                val txt by addressTxt;
                 Text(
                     text = txt,
                     modifier = modifier,
@@ -196,4 +244,12 @@ fun GreetingPreview() {
             Greeting("Android")
         }
     }
+}
+
+fun Double.toFixedString(): String {
+    return String.format(Locale.getDefault(), "%.3f", this)
+}
+
+fun Float.toFixedString(): String {
+    return String.format(Locale.getDefault(), "%.3f", this)
 }
