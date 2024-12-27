@@ -3,6 +3,7 @@ package com.example.android_experiment_1
 import android.Manifest
 import android.annotation.SuppressLint
 import android.location.Geocoder
+import android.location.Location
 import android.os.Bundle
 import android.os.Looper
 import android.util.Log
@@ -20,19 +21,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.android_experiment_1.data.AddressResolver
 import com.example.android_experiment_1.ui.theme.AndroidExperiment1Theme
 import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
-import androidx.compose.runtime.getValue
-import com.example.android_experiment_1.data.AddressResolver
+import com.google.android.gms.location.LocationAvailability
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import java.util.Locale
 
@@ -40,10 +42,11 @@ private const val logTag = "LOGTAG1"
 private val locationProviderTxt = mutableStateOf("?")
 private val altitudeTxt = mutableStateOf("?")
 private val speedTxt = mutableStateOf("?")
+private val speedAccuracyTxt = mutableStateOf("?")
 private val longitudeTxt = mutableStateOf("?")
 private val latitudeTxt = mutableStateOf("?")
 private val addressTxt = mutableStateOf("?")
-private val accuracyTxt = mutableStateOf("?")
+private val locationAccuracyTxt = mutableStateOf("?")
 
 class MainActivity : ComponentActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -64,39 +67,36 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        val mGeocoder = Geocoder(applicationContext, Locale.getDefault())
 
         requestPermissions()
 
-        val mGeocoder = Geocoder(applicationContext, Locale.getDefault())
-        val addressResolver = AddressResolver()
-
         locationCallback = object : LocationCallback() {
+            override fun onLocationAvailability(p0: LocationAvailability) {
+                Log.i("LOGTAG1", "p0.isLocationAvailable: ${p0.isLocationAvailable}")
+            }
             override fun onLocationResult(locationResult: LocationResult) {
-                if(locationResult.locations.size != 1) {
-                    Log.e(logTag, "locationResult.locations.size: ${locationResult.locations.size}");
-                }
                 val location = locationResult.locations[0];
-                locationProviderTxt.value = location.provider ?: "!"
-                altitudeTxt.value = location.altitude.toFixedString()
-                speedTxt.value = location.speed.toFixedString()
-                longitudeTxt.value = location.longitude.toFixedString()
-                latitudeTxt.value = location.latitude.toFixedString()
-                accuracyTxt.value =  location.accuracy.toFixedString()
-
-                val addresses = mGeocoder.getFromLocation(location.latitude, location.longitude, 5)
-                val addressLine = addressResolver.resolve(addresses)
-                addressTxt.value = addressLine
+                onLocationReceived(location, mGeocoder)
             }
         }
 
-        val locationRequest = LocationRequest.Builder(5000)
+        val locationRequest = LocationRequest
+            .Builder(5000)
             .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
             .build()
 
-        fusedLocationClient.requestLocationUpdates(locationRequest,
+        fusedLocationClient.requestLocationUpdates(
+            locationRequest,
             locationCallback,
-            Looper.getMainLooper())
+            Looper.getMainLooper()
+        )
+
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+             onLocationReceived(location, mGeocoder)
+        }
     }
 
     private fun requestPermissions() {
@@ -107,9 +107,11 @@ class MainActivity : ComponentActivity() {
                 permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
                     // Precise location access granted.
                 }
+
                 permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
                     // Only approximate location access granted.
                 }
+
                 else -> {
                     // No location access granted.
                 }
@@ -127,6 +129,38 @@ class MainActivity : ComponentActivity() {
             )
         )
     }
+
+    private fun onLocationReceived(location: Location, mGeocoder: Geocoder) {
+        val addressResolver = AddressResolver()
+
+        locationProviderTxt.value = location.provider ?: "!"
+
+        altitudeTxt.value = if (location.hasAltitude()) {
+            location.altitude.toFixedString()
+        } else "-"
+
+        speedTxt.value = if (location.hasSpeed()) {
+            location.speed.mpsToKmph().toFixedString()
+        } else "-"
+
+        speedAccuracyTxt.value =
+            if (location.hasSpeedAccuracy()) {
+                location.speedAccuracyMetersPerSecond.mpsToKmph().toFixedString()
+            } else "-"
+
+        longitudeTxt.value = location.longitude.toFixedString()
+
+        latitudeTxt.value = location.latitude.toFixedString()
+
+        locationAccuracyTxt.value =
+            if (location.hasAccuracy()) {
+                location.accuracy.toFixedString()
+            } else "-"
+
+        val addresses = mGeocoder.getFromLocation(location.latitude, location.longitude, 5)
+        val addressLine = addressResolver.resolve(addresses)
+        addressTxt.value = addressLine
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -137,49 +171,63 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        FlowRow (
+        FlowRow(
             horizontalArrangement = Arrangement.spacedBy(40.dp)
         ) {
             val spacing = 5.dp;
-            
+
             Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                val txt by latitudeTxt;
+                val latTxt by latitudeTxt;
                 Text(
                     text = "Lat",
                     modifier = modifier,
                 )
                 Text(
-                    text = txt,
+                    text = latTxt,
                     modifier = modifier,
                 )
                 Text(
-                    text = "deg",
+                    text = "°",
                     modifier = modifier,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                val txt by longitudeTxt;
+                val longText by longitudeTxt;
                 Text(
                     text = "Long",
                     modifier = modifier,
                 )
                 Text(
-                    text = txt,
+                    text = longText,
                     modifier = modifier,
                 )
                 Text(
-                    text = "deg",
+                    text = "°",
                     modifier = modifier,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
                 val txt by speedTxt;
+                val accuracy by speedAccuracyTxt;
+
                 Text(
                     text = "Speed",
                     modifier = modifier,
                 )
                 Text(
                     text = txt,
+                    modifier = modifier,
+                )
+                Text(
+                    text = "km/hr",
+                    modifier = modifier,
+                )
+                Text(
+                    text = "±",
+                    modifier = modifier,
+                )
+                Text(
+                    text = accuracy,
                     modifier = modifier,
                 )
                 Text(
@@ -214,9 +262,9 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                val txt by accuracyTxt;
+                val txt by locationAccuracyTxt;
                 Text(
-                    text = "Accuracy",
+                    text = "Accuracy ±",
                     modifier = modifier,
                 )
                 Text(
@@ -224,7 +272,7 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
                     modifier = modifier,
                 )
                 Text(
-                    text = "%",
+                    text = "m",
                     modifier = modifier,
                 )
             }
@@ -249,10 +297,8 @@ fun GreetingPreview() {
     }
 }
 
-fun Double.toFixedString(): String {
-    return String.format(Locale.getDefault(), "%.3f", this)
-}
+fun Double.toFixedString() = String.format(Locale.getDefault(), "%.3f", this)
 
-fun Float.toFixedString(): String {
-    return String.format(Locale.getDefault(), "%.3f", this)
-}
+fun Float.toFixedString() = String.format(Locale.getDefault(), "%.3f", this)
+
+fun Float.mpsToKmph() = this * 3.6
